@@ -44,3 +44,7 @@ node test/skatt.test.js
 | Arbeidsgiveravgift | Sone I 14,1 %, II 10,6 %, III 6,4 %, IV 5,1 %, IVa 7,9 %, V 0 % |
 
 Kalkulatoren gir et anslag og erstatter ikke rådgivning fra regnskapsfører.
+
+## Lisens
+
+[MIT](LICENSE). Du kan fritt bruke, endre og videreformidle koden, også kommersielt.
