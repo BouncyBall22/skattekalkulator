@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lønn eller utbytte?</title>
+<meta name="description" content="Skattekalkulator for eiere av AS med seg selv som eneste ansatt. Finn optimal fordeling mellom lønn og utbytte for inntektsåret 2026.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Schibsted+Grotesk:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<!--SIDE-START-->
+<header class="topp">
+  <div class="topp-indre">
+    <p class="eyebrow">Inntektsåret 2026 · AS med én ansatt</p>
+    <h1>Lønn eller utbytte?</h1>
+    <p class="ingress">Legg inn omsetning og kostnader i selskapet. Kalkulatoren finner lønnen som gir mest igjen til deg etter arbeidsgiveravgift, selskapsskatt, utbytteskatt og personskatt, og lar deg sammenligne egne scenarier krone for krone.</p>
+  </div>
+</header>
+
+<main class="ramme">
+  <aside class="inndata" aria-label="Forutsetninger">
+    <form id="skjema" autocomplete="off">
+      <fieldset>
+        <legend>Selskapet</legend>
+        <label class="felt">
+          <span>Omsetning</span>
+          <input id="omsetning" class="kr" type="text" inputmode="numeric" value="1 500 000">
+        </label>
+        <label class="felt">
+          <span>Driftskostnader <small>ekskl. lønn</small></span>
+          <input id="kostnader" class="kr" type="text" inputmode="numeric" value="150 000">
+        </label>
+        <label class="felt">
+          <span>Arbeidsgiveravgift</span>
+          <select id="agaSone"></select>
+        </label>
+        <label class="felt">
+          <span>OTP-innskudd <small>% av lønn mellom 1 G og 12 G</small></span>
+          <input id="otpSats" class="pst" type="number" min="0" max="7" step="0.5" value="2">
+        </label>
+        <label class="felt">
+          <span>Fri egenkapital fra før <small>kan deles ut i tillegg</small></span>
+          <input id="friEK" class="kr" type="text" inputmode="numeric" value="0">
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Deg som eier</legend>
+        <label class="felt">
+          <span>Andre fradrag <small>renter, fagforening, pendling</small></span>
+          <input id="fradrag" class="kr" type="text" inputmode="numeric" value="0">
+        </label>
+        <label class="felt">
+          <span>Inngangsverdi aksjer <small>aksjekapital + overkurs</small></span>
+          <input id="inngangsverdi" class="kr" type="text" inputmode="numeric" value="30 000">
+        </label>
+        <label class="felt">
+          <span>Skjermingsrente</span>
+          <input id="skjermingsrente" class="pst" type="number" min="0" max="10" step="0.1" value="4.0">
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Formue</legend>
+        <label class="felt">
+          <span>Annen nettoformue <small>skattemessig verdi</small></span>
+          <input id="privatFormue" class="kr" type="text" inputmode="numeric" value="1 200 000">
+        </label>
+        <label class="felt">
+          <span>Verdi av AS ved årets start <small>skattemessig egenkapital</small></span>
+          <input id="asFormue" class="kr" type="text" inputmode="numeric" value="400 000">
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Slik regnes totalen</legend>
+        <label class="bryter">
+          <input id="medLatent" type="checkbox" checked>
+          <span>Ta med fremtidig utbytteskatt på penger som blir igjen i selskapet</span>
+        </label>
+        <label class="bryter">
+          <input id="medFormue" type="checkbox">
+          <span>Ta med formuesskatt i total skatt</span>
+        </label>
+        <label class="felt">
+          <span>Verdien av OTP-innskudd i optimeringen</span>
+          <select id="otpVekt">
+            <option value="0">Teller ikke (bare kontanter)</option>
+            <option value="0.5">Halv verdi</option>
+            <option value="1">Full verdi</option>
+          </select>
+        </label>
+      </fieldset>
+      <button type="button" id="nullstill" class="lenkeknapp">Tilbakestill til eksempeltall</button>
+    </form>
+  </aside>
+
+  <div class="resultat">
+    <section class="anbefaling" aria-labelledby="anb-tittel">
+      <div class="anb-hoved">
+        <p class="eyebrow" id="anb-tittel">Anbefalt lønn</p>
+        <p class="stortall" id="anbLonn">–</p>
+        <p class="anb-tekst" id="anbTekst"></p>
+        <button type="button" id="brukAnbefaling" class="knapp">Bruk anbefalingen</button>
+      </div>
+      <dl class="nokkeltall">
+        <div><dt>Utbytte</dt><dd id="anbUtbytte">–</dd></div>
+        <div><dt>Netto til deg</dt><dd id="anbNetto">–</dd></div>
+        <div><dt>Total skatt</dt><dd id="anbSkatt">–</dd></div>
+        <div><dt>Effektiv skattesats</dt><dd id="anbSats">–</dd></div>
+      </dl>
+    </section>
+
+    <section class="kort" aria-labelledby="juster-tittel">
+      <div class="kort-hode">
+        <h2 id="juster-tittel">Din fordeling</h2>
+        <p class="hint">Dra i glidebryterne eller skriv inn beløp. Utbytte og det som blir igjen i selskapet henger sammen.</p>
+      </div>
+      <div class="glidere">
+        <div class="glider" data-serie="lonn">
+          <label for="lonnRange">Lønn</label>
+          <input id="lonnInput" class="kr verdi" type="text" inputmode="numeric" aria-label="Lønn i kroner">
+          <input id="lonnRange" type="range" min="0" step="1000">
+        </div>
+        <div class="glider" data-serie="utbytte">
+          <label for="utbytteRange">Utbytte</label>
+          <input id="utbytteInput" class="kr verdi" type="text" inputmode="numeric" aria-label="Utbytte i kroner">
+          <input id="utbytteRange" type="range" min="0" step="1000">
+        </div>
+        <div class="glider" data-serie="beholdt">
+          <label for="beholdtRange">Igjen i selskapet</label>
+          <input id="beholdtInput" class="kr verdi" type="text" inputmode="numeric" aria-label="Beløp som blir igjen i selskapet">
+          <input id="beholdtRange" type="range" step="1000">
+        </div>
+      </div>
+      <div class="fordelingsbar" id="fordelingsbar" role="img" aria-label="Hvor overskuddet går"></div>
+      <ul class="tegnforklaring" id="fordelingsforklaring"></ul>
+      <div class="sammendrag" id="sammendrag"></div>
+    </section>
+
+    <section class="kort" aria-labelledby="skjaering-tittel">
+      <div class="kort-hode">
+        <h2 id="skjaering-tittel">Hvor slutter lønn å lønne seg?</h2>
+        <p class="hint">Samlet marginalskatt på neste krone av overskuddet, tatt ut som lønn eller som utbytte. Skatten på lønn inkluderer arbeidsgiveravgift; skatten på utbytte inkluderer selskapsskatt.</p>
+      </div>
+      <p class="funn" id="skjaeringTekst"></p>
+      <div class="diagram"><canvas id="marginalDiagram"></canvas></div>
+    </section>
+
+    <section class="kort" aria-labelledby="total-tittel">
+      <div class="kort-hode">
+        <h2 id="total-tittel">Total skatt ved ulike lønnsnivåer</h2>
+        <p class="hint">Resten av overskuddet går som utbytte, og beløpet du har valgt å beholde blir i selskapet.</p>
+      </div>
+      <div class="diagram hoy"><canvas id="totalDiagram"></canvas></div>
+    </section>
+
+    <section class="kort" aria-labelledby="oppstilling-tittel">
+      <div class="kort-hode">
+        <h2 id="oppstilling-tittel">Skatteoppstilling for din fordeling</h2>
+      </div>
+      <div class="tabellrull"><table class="oppstilling" id="oppstilling"></table></div>
+    </section>
+
+    <section class="kort" aria-labelledby="rettigheter-tittel">
+      <div class="kort-hode">
+        <h2 id="rettigheter-tittel">Pensjon og trygderettigheter</h2>
+        <p class="hint">Utbytte gir ingen opptjening i folketrygden. Lønn gir pensjon, sykepenger og foreldrepenger opp til visse grenser.</p>
+      </div>
+      <ul class="rettigheter" id="rettigheter"></ul>
+    </section>
+
+    <section class="kort" aria-labelledby="scenario-tittel">
+      <div class="kort-hode">
+        <h2 id="scenario-tittel">Sammenlign scenarier</h2>
+        <p class="hint">Faste scenarier oppdateres når du endrer forutsetningene. Lagre din egen fordeling for å sammenligne den med de andre.</p>
+      </div>
+      <div class="scenario-verktoy">
+        <label class="felt innebygd">
+          <span>Navn på scenario</span>
+          <input id="scenarioNavn" type="text" maxlength="40" placeholder="F.eks. Lønn 700 000">
+        </label>
+        <button type="button" id="lagreScenario" class="knapp">Lagre min fordeling</button>
+        <label class="felt innebygd">
+          <span>Sammenlign mot</span>
+          <select id="baseScenario"></select>
+        </label>
+      </div>
+      <div class="tabellrull"><table class="scenarier" id="scenarioTabell"></table></div>
+      <div class="diagram"><canvas id="scenarioDiagram"></canvas></div>
+    </section>
+
+    <section class="fotnote">
+      <h2>Satser og forbehold</h2>
+      <p>Satsene gjelder inntektsåret 2026: trinnskatt fra 226 100 kr, trygdeavgift 7,6 %, personfradrag 114 540 kr, minstefradrag 46 % (maks 95 700 kr), selskapsskatt og skatt på alminnelig inntekt 22 %, oppjusteringsfaktor for utbytte 1,72 og G = 136 549 kr. Formuesskatt er 1,0 % over 1,9 mill. kr og 1,1 % over 21,5 mill. kr, og aksjer verdsettes til 80 %.</p>
+      <p>Kalkulatoren gir et anslag. Den tar ikke hensyn til fremførbart underskudd, ubenyttet skjerming fra tidligere år, skattebegrensningsregelen eller fordeling mellom ektefeller. Skjermingsrenten for 2026 fastsettes i januar 2027. Utbytte forutsetter at selskapet har fri egenkapital og forsvarlig egenkapital og likviditet etter aksjeloven. Sjekk med regnskapsfører før du tar beslutninger.</p>
+    </section>
+  </div>
+</main>
+<!--SIDE-SLUTT-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="js/skatt.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
