@@ -233,6 +233,36 @@
     // "Netto" skal ikke stables oppå skatten.
     diagrammer.total.options.scales.y.stacked = false;
 
+    diagrammer.kurve = new Chart($('kurveDiagram'), {
+      type: 'line',
+      data: { datasets: [
+        { label: 'Total skatt', data: [], borderColor: f.aga, backgroundColor: medAlfa(f.aga, 0.12), fill: 'start', borderWidth: 2.5, pointRadius: 0, tension: 0, order: 3 },
+        { label: 'Laveste skatt', data: [], type: 'scatter', borderColor: f.god, backgroundColor: f.god, pointRadius: 6, pointHoverRadius: 8, order: 1 },
+        { label: 'Din lønn', data: [], type: 'scatter', borderColor: f.lonn, backgroundColor: f.flate, borderWidth: 2.5, pointRadius: 6, pointHoverRadius: 8, order: 2 }
+      ] },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false, parsing: false,
+        interaction: { mode: 'nearest', axis: 'x', intersect: false },
+        scales: {
+          x: Object.assign({}, krAkse, { title: { display: true, text: 'Lønn' } }),
+          y: Object.assign({}, krAkse, { title: { display: true, text: 'Total skatt' }, ticks: { callback: function (v) { return krKort(v); }, maxTicksLimit: 7 } })
+        },
+        plugins: {
+          legend: { position: 'bottom', labels: { boxWidth: 12, boxHeight: 12 } },
+          tooltip: Object.assign({}, tooltipBase, { callbacks: {
+            title: function (it) { return 'Lønn ' + kr(it[0].parsed.x); },
+            label: function (it) {
+              var min = diagrammer.kurve.$min || 0;
+              var d = it.parsed.y - min;
+              return it.dataset.label + ': ' + kr(it.parsed.y) + (Math.round(d) > 0 ? ' (' + medFortegn(d) + ' mot laveste)' : '');
+            }
+          } }),
+          markorer: { liste: [] }
+        }
+      },
+      plugins: [markorPlugin]
+    });
+
     diagrammer.scenario = new Chart($('scenarioDiagram'), {
       type: 'bar',
       data: { labels: [], datasets: [] },
@@ -280,6 +310,7 @@
     visFordeling(r, anbefalt);
     visMarginal(p, r, anbefalt);
     visTotal(p, r, anbefalt);
+    visKurve(p, r);
     visOppstilling(r);
     visRettigheter(r);
     visScenarier(p, anbefalt, r);
@@ -448,6 +479,48 @@
       { x: r.lonn, farge: f.lonn, tekst: 'Din lønn', bredde: 2 }
     ];
     ch.update('none');
+  }
+
+  /* Total skatt fra 0 til maks lønn, med y-aksen skalert rundt laveste og høyeste skatt. */
+  function visKurve(p, r) {
+    var f = farger();
+    var maksL = S.maksLonn(p, valg.beholdt);
+    var n = 240, punkter = [];
+    for (var i = 0; i <= n; i++) {
+      var L = maksL * i / n;
+      punkter.push({ x: L, y: S.beregn(p, L, valg.beholdt).totalSkatt });
+    }
+    // Finjuster rundt laveste punkt i grovsøket.
+    var minP = punkter.reduce(function (a, b) { return b.y < a.y ? b : a; });
+    var steg = maksL / n;
+    for (var L2 = Math.max(0, minP.x - steg); L2 <= Math.min(maksL, minP.x + steg); L2 += 50) {
+      var y = S.beregn(p, L2, valg.beholdt).totalSkatt;
+      if (y < minP.y - 0.5) minP = { x: L2, y: y };
+    }
+    var maksY = punkter.reduce(function (a, b) { return Math.max(a, b.y); }, minP.y);
+    var spenn = Math.max(maksY - minP.y, 1000);
+    var ch = diagrammer.kurve;
+    ch.$min = minP.y;
+    ch.data.datasets[0].data = punkter;
+    ch.data.datasets[1].data = [minP];
+    ch.data.datasets[2].data = [{ x: r.lonn, y: r.totalSkatt }];
+    ch.options.scales.x.min = 0;
+    ch.options.scales.x.max = maksL || 1;
+    // Rund aksegrensene til et pent steg (1, 2 eller 5 × 10^n).
+    var grov = spenn / 5, tierpot = Math.pow(10, Math.floor(Math.log10(grov)));
+    var pent = [1, 2, 5, 10].map(function (k) { return k * tierpot; }).filter(function (s) { return s >= grov; })[0];
+    ch.options.scales.y.min = Math.max(0, Math.floor((minP.y - spenn * 0.05) / pent) * pent);
+    ch.options.scales.y.max = Math.ceil((maksY + spenn * 0.03) / pent) * pent;
+    ch.options.scales.y.ticks.stepSize = pent;
+    ch.options.plugins.markorer.liste = [{ x: minP.x, farge: f.god, tekst: 'Laveste skatt ' + krKort(minP.x), stiplet: true }];
+    ch.update('none');
+
+    var dyrest = punkter.reduce(function (a, b) { return b.y > a.y ? b : a; });
+    var diff = r.totalSkatt - minP.y;
+    $('kurveTekst').innerHTML = 'Laveste totalskatt er <strong>' + kr(minP.y) + '</strong> ved en lønn på <strong>' +
+      kr(Math.round(minP.x / 100) * 100) + '</strong>. Høyeste er ' + kr(dyrest.y) + ' ved ' + kr(dyrest.x) +
+      ', altså ' + kr(dyrest.y - minP.y) + ' mer. ' +
+      (Math.round(diff) > 0 ? 'Din fordeling gir ' + kr(diff) + ' mer enn laveste skatt.' : 'Din fordeling ligger på laveste skatt.');
   }
 
   function visOppstilling(r) {
